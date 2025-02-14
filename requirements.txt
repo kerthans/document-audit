@@ -1,0 +1,6 @@
+requests==2.31.0
+tornado==6.4.0
+pytest==8.0.0
+pytest-tornado==0.8.1
+pytest-asyncio==0.23.5
+python-dotenv==1.0.0 

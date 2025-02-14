@@ -1,5 +1,5 @@
 # 配置文件
-config.py
+config/config.py
 
 # Python
 __pycache__/
@@ -21,4 +21,12 @@ ENV/
 
 # 系统文件
 .DS_Store
-Thumbs.db 
+Thumbs.db
+
+# 日志文件
+logs/
+*.log
+
+# 上传的文件
+knowledge_base/*
+!knowledge_base/.gitkeep 
