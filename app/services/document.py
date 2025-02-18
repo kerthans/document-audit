@@ -1,9 +1,10 @@
 import requests
 import json
-from config.config import DIFY_CONFIG
+import os
+import glob
+from config.config import DIFY_CONFIG, FILE_CONFIG
 from ..utils.logger import logger
 from .workflow import WorkflowService
-import os
 
 class DocumentService:
     def __init__(self):
@@ -12,10 +13,30 @@ class DocumentService:
         self.base_url = DIFY_CONFIG['base_url']
         self.workflow_service = WorkflowService()
     
+    def _clean_knowledge_base(self):
+        """清理knowledge_base文件夹，只保留最新文件"""
+        knowledge_base_dir = FILE_CONFIG['upload_dir']
+        files = glob.glob(os.path.join(knowledge_base_dir, '*'))
+        for file in files:
+            try:
+                os.remove(file)
+                logger.info(f"已删除旧文件: {file}")
+            except Exception as e:
+                logger.error(f"删除文件失败: {file}, 错误: {str(e)}")
+    
     async def upload_document(self, file_info):
         """上传文档到Dify并进行法规评估"""
         try:
-            # 1. 上传到知识库
+            # 清理knowledge_base文件夹
+            self._clean_knowledge_base()
+            
+            # 保存新文件到knowledge_base
+            file_path = os.path.join(FILE_CONFIG['upload_dir'], file_info['filename'])
+            with open(file_path, 'wb') as f:
+                f.write(file_info['body'])
+            logger.info(f"已保存新文件到knowledge_base: {file_info['filename']}")
+            
+            # 1. 上传到Dify知识库
             url = f"{self.base_url}/datasets/{self.dataset_id}/document/create-by-text"
             
             headers = {
@@ -37,21 +58,13 @@ class DocumentService:
             response = requests.post(url, headers=headers, json=data)
             response.raise_for_status()
             
-            logger.info(f"文件已上传到知识库: {file_info['filename']}")
+            logger.info(f"文件已上传到Dify知识库: {file_info['filename']}")
             
             # 2. 进行法规评估
-            base_file_path = 'knowledge_base/厂区环境布局.md'
             law_list_dir = 'Law_list'
             
             # 确保输出目录存在
             os.makedirs('Judge_output', exist_ok=True)
-            
-            # 保存上传的文件到临时位置
-            temp_file_path = os.path.join('temp_uploads', file_info['filename'])
-            os.makedirs('temp_uploads', exist_ok=True)
-            
-            with open(temp_file_path, 'wb') as f:
-                f.write(file_info['body'])
             
             # 运行工作流进行评估
             assessment_results = []
@@ -60,7 +73,7 @@ class DocumentService:
                     law_file_path = os.path.join(law_list_dir, law_file)
                     
                     logger.info(f"正在评估文件 {file_info['filename']} 与法规 {law_file}")
-                    output_text = await self.workflow_service.run_workflow(law_file_path, temp_file_path)
+                    output_text = await self.workflow_service.run_workflow(law_file_path, file_path)
                     
                     if output_text:
                         assessment_results.append({
@@ -73,9 +86,6 @@ class DocumentService:
                         with open(output_path, 'w', encoding='utf-8') as f:
                             f.write(output_text)
                         logger.info(f"已保存评估结果: {output_path}")
-            
-            # 清理临时文件
-            os.remove(temp_file_path)
             
             return {
                 'upload_status': 'success',

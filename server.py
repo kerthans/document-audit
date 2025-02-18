@@ -8,12 +8,13 @@ import sys
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 # 修改导入语句
-from app.services.chat import ChatService  # 替换原来的chat_system导入
-from app.services.document import DocumentService  # 替换原来的upload_document导入
+from app.services.chat import ChatService
+from app.services.document import DocumentService
 from config.config import DIFY_CONFIG, FILE_CONFIG
 from app.handlers.chat import ChatHandler
 from app.handlers.upload import UploadHandler
 from app.handlers.document import DocumentListHandler
+from app.utils.logger import logger
 
 class BaseHandler(tornado.web.RequestHandler):
     def set_default_headers(self):
@@ -61,7 +62,7 @@ class ChatHandler(BaseHandler):
 
 class UploadHandler(BaseHandler):
     def initialize(self):
-        self.document_service = DocumentService()  # 创建服务实例
+        self.document_service = DocumentService()
     
     async def post(self):
         try:
@@ -76,23 +77,27 @@ class UploadHandler(BaseHandler):
             with open(file_path, 'wb') as f:
                 f.write(file_info['body'])
             
-            # 上传到Dify
-            result = await self.document_service.upload_document(file_info)  # 使用实例方法
+            # 上传到Dify并进行法规评估
+            result = await self.document_service.upload_document(file_info)
             
             if result:
                 self.write({
                     "status": "success",
-                    "message": "文件上传成功",
-                    "data": result
+                    "message": "文件上传并完成法规评估",
+                    "data": {
+                        "upload_result": result['upload_response'],
+                        "assessments": result['assessments']
+                    }
                 })
             else:
                 self.set_status(500)
                 self.write({
                     "status": "error",
-                    "message": "文件上传失败"
+                    "message": "文件处理失败"
                 })
                 
         except Exception as e:
+            logger.error(f"处理上传请求时发生错误: {str(e)}")
             self.set_status(500)
             self.write({
                 "status": "error",
@@ -143,5 +148,5 @@ def make_app():
 if __name__ == "__main__":
     app = make_app()
     app.listen(8888)
-    print("服务器启动在 http://localhost:8888")
+    print("Server is running at http://localhost:8888")
     tornado.ioloop.IOLoop.current().start() 

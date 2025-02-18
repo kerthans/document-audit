@@ -1,183 +1,129 @@
-# 工业企业设计标准知识库系统
+# 工业企业设计标准智能问答系统
 
-基于Dify API的工业企业设计标准知识库检索系统，使用Tornado框架实现Web服务器功能。系统提供文档上传、管理和智能问答功能。
-
-## 项目结构
-
-```
-file_index/
-├── app/                    # 应用程序核心目录
-│   ├── handlers/          # 处理器目录
-│   │   ├── base.py       # 基础处理器
-│   │   ├── chat.py       # 聊天处理器
-│   │   ├── document.py   # 文档处理器
-│   │   └── upload.py     # 上传处理器
-│   ├── services/         # 服务层目录
-│   │   ├── chat.py       # 聊天服务
-│   │   └── document.py   # 文档服务
-│   ├── middleware/       # 中间件目录
-│   │   └── error_handler.py  # 错误处理
-│   └── utils/            # 工具函数目录
-│       ├── config_validator.py  # 配置验证
-│       ├── helpers.py    # 辅助函数
-│       └── logger.py     # 日志工具
-├── config/               # 配置文件目录
-│   ├── config.py        # 配置文件
-│   └── config.example.py # 配置模板
-├── logs/                # 日志目录
-├── static/             # 静态文件目录
-├── templates/          # 模板目录
-│   └── index.html     # Web界面
-├── tests/             # 测试目录
-│   └── test_chat.py   # 聊天功能测试
-├── knowledge_base/    # 知识库文件目录
-├── .gitignore        # Git忽略文件
-├── requirements.txt   # 项目依赖
-├── server.py         # 服务器入口
-└── README.md         # 项目说明
-```
+## 项目简介
+本项目是一个基于智谱AI GLM-4和Dify知识库的工业企业设计标准智能问答系统。系统可以根据用户的问题，从工业企业设计标准知识库中检索相关内容，并通过大模型分析和优化后给出专业的答复。
 
 ## 功能特点
+- 智能问答：支持自然语言提问，系统会从知识库中检索相关标准并给出答案
+- 知识库管理：支持标准文档的上传、更新和管理
+- 对话历史：保存用户的问答历史，支持上下文理解
+- 专业优化：使用GLM-4模型对答案进行专业性优化
+- 实时反馈：显示检索进度和处理状态
 
-- RESTful API接口
-- Web界面操作
-- 文档上传和管理
-- 智能问答系统
-- 错误处理和日志记录
-- 配置验证和管理
-
-## 安装和配置
-
-1. 创建并激活虚拟环境：
-```bash
-# Windows
-python -m venv venv
-venv\Scripts\activate
-
-# Linux/Mac
-python3 -m venv venv
-source venv/bin/activate
+## 项目结构
+```
+industrial-standards-qa/
+├── app/                    # 应用主目录
+│   ├── handlers/          # 请求处理器
+│   │   ├── chat.py       # 聊天处理器
+│   │   └── document.py   # 文档处理器
+│   ├── services/         # 业务逻辑服务
+│   │   └── chat.py      # 聊天服务
+│   └── utils/           # 工具函数
+│       ├── helpers.py   # 辅助函数
+│       └── logger.py    # 日志工具
+├── config/               # 配置文件目录
+│   └── config.py        # 配置文件
+├── static/              # 静态资源文件
+├── templates/           # 前端模板
+│   └── index.html      # 主页面
+├── .env                 # 环境变量
+├── requirements.txt     # 项目依赖
+└── server.py           # 服务器入口
 ```
 
-2. 安装依赖：
+## 环境要求
+- Python 3.8+
+- 智谱AI API密钥
+- Dify API密钥和数据集
+
+## 快速开始
+
+1. 克隆项目并安装依赖：
 ```bash
+git clone <repository-url>
+cd industrial-standards-qa
 pip install -r requirements.txt
 ```
 
-3. 配置系统：
+2. 配置环境变量：
 ```bash
-cp config/config.example.py config/config.py
-# 编辑 config/config.py 填入配置信息
+cp .env.example .env
+# 编辑 .env 文件，填写必要的配置信息
 ```
 
-## API接口
-
-### 1. 聊天接口
-```
-POST /api/chat
-Content-Type: application/json
-
-{
-    "query": "您的问题"
-}
-```
-
-### 2. 文档上传
-```
-POST /api/upload
-Content-Type: multipart/form-data
-
-file: [文件]
-```
-
-### 3. 文档列表
-```
-GET /api/documents
-```
-
-## 配置说明
-
-### Dify配置
-```python
-DIFY_CONFIG = {
-    "api_key": "your-api-key",
-    "dataset_id": "your-dataset-id",
-    "base_url": "https://api.dify.ai/v1"
-}
-```
-
-### 检索配置
-```python
-RETRIEVAL_CONFIG = {
-    "top_k": 5,
-    "search_method": "hybrid_search",
-    "weights": {
-        "keyword": 0.7,
-        "semantic": 0.3
-    }
-}
-```
-
-## 使用说明
-
-1. 启动服务器：
+3. 启动服务：
 ```bash
 python server.py
 ```
 
-2. 访问Web界面：
-- 打开浏览器访问 http://localhost:8888
-- 使用上传功能添加文档
-- 在问答界面输入问题
+4. 访问系统：
+打开浏览器访问 `http://localhost:8888`
 
-3. 使用API：
-- 参考API文档进行接口调用
-- 使用Postman等工具测试
+## API文档
 
-## 开发指南
-
-1. 错误处理：
-- 使用error_handler装饰器处理异常
-- 错误日志记录在logs目录
-
-2. 日志系统：
-- 日志文件按日期生成
-- 包含INFO和ERROR级别日志
-
-3. 测试：
-```bash
-python -m pytest tests/
+### 1. 问答接口
+- 接口：`/api/chat`
+- 方法：POST
+- 请求体：
+```json
+{
+    "query": "问题内容"
+}
+```
+- 响应：
+```json
+{
+    "status": "success",
+    "data": {
+        "answer": "回答内容",
+        "knowledge_base_content": "知识库内容",
+        "metadata": {
+            "model": "glm-4",
+            "usage": {
+                "total_tokens": 1234
+            }
+        }
+    }
+}
 ```
 
+### 2. 文件上传接口
+- 接口：`/api/upload`
+- 方法：POST
+- 请求体：multipart/form-data
+- 响应：
+```json
+{
+    "status": "success",
+    "message": "文件上传成功"
+}
+```
+
+## 使用说明
+1. 在输入框中输入工业企业设计相关问题
+2. 系统会从知识库中检索相关标准并给出答案
+3. 可以查看知识库匹配内容和答案的专业性优化
+
+## 技术栈
+- 前端：原生JavaScript + HTML/CSS
+- 后端：Python + Tornado
+- AI模型：智谱AI GLM-4
+- 知识库：Dify
+
 ## 注意事项
+- 请确保API密钥的安全性
+- 建议在生产环境中启用HTTPS
+- 定期备份知识库数据
+- 注意API调用频率限制
 
-1. 安全性：
-- 保护API密钥
-- 注意文件上传限制
-- 定期更新密钥
-
-2. 性能：
-- 注意API调用频率
-- 大文件上传需要时间
-- 日志文件定期清理
-
-## 常见问题
-
-1. 配置问题：
-- 检查API密钥格式
-- 确认数据集ID正确
-- 验证配置文件完整性
-
-2. 上传失败：
-- 检查文件格式
-- 确认文件大小限制
-- 查看错误日志
+## 许可证
+MIT License
 
 ## 更新日志
+- 2024-03-20
+  - 初始版本发布
+  - 实现基础问答功能
+  - 添加文件上传功能
+  - 优化用户界面
 
-- 2024-03-20：
-  - 重构项目结构
-  - 添加错误处理
-  - 完善日志系统
-  - 优化文件上传
-  - 改进API接口
