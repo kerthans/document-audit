@@ -4,7 +4,7 @@
 
 [![中文](https://img.shields.io/badge/语言-中文-red.svg)](./README.md)
 [![English](https://img.shields.io/badge/Lang-English-blue.svg)](./README_EN.md)
-[![Stars](https://img.shields.io/github/stars/kerthans/document-audit?style=social)](https://github.com/kerthans/frontend)
+[![Stars](https://img.shields.io/github/stars/kerthans/document-audit?style=social)](https://github.com/kerthans/document-audit)
 [![Visits](https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fgithub.com%2Fkerthans%2Fdocument-audit&count_bg=%2379C83D&title_bg=%23555555&icon=&icon_color=%23E7E7E7&title=visits&edge_flat=false)](https://hits.seeyoufarm.com)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
@@ -64,7 +64,7 @@ npm run dev
 
 ## 🔧 技术架构
 
-```json
+```tree
 ├── README.md
 ├── README_EN.md
 ├── next.config.js
