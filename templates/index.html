@@ -2,7 +2,8 @@
 <html lang="zh">
 <head>
     <meta charset="UTF-8">
-    <title>工业企业设计标准知识库系统</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>工业企业法规评估系统</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -182,128 +183,32 @@
     </style>
 </head>
 <body>
-    <!-- 进度条 -->
-    <div id="progress-bar"></div>
-    
-    <!-- 在progress-bar下面添加进度状态显示 -->
-    <div id="progress-status" style="display: none; text-align: center; padding: 10px; color: #666;">
-        <span id="status-text">处理中...</span>
-    </div>
-    
-    <h1>工业企业设计标准知识库系统</h1>
-    
-    <div class="upload-container">
-        <h2>上传文档</h2>
-        <form id="uploadForm">
-            <input type="file" id="fileInput" accept=".md,.txt">
-            <button type="submit">上传</button>
-        </form>
-        <div id="uploadStatus"></div>
-    </div>
-
-    <!-- 聊天界面 -->
-    <div class="chat-container">
-        <div class="chat-history" id="chat-history"></div>
-        <div class="input-container">
-            <input type="text" id="query-input" placeholder="请输入您的问题...">
+    <div id="app">
+        <h1>工业企业法规评估系统</h1>
+        
+        <!-- 聊天界面 -->
+        <div class="chat-container">
+            <textarea id="query-input" placeholder="请输入您的问题..."></textarea>
             <button onclick="sendQuery()">发送</button>
-            <button onclick="clearHistory()">清除历史</button>
+            <div id="response-container"></div>
+        </div>
+
+        <!-- 文件上传界面 -->
+        <div class="upload-container">
+            <input type="file" id="file-input">
+            <button onclick="uploadFile()">上传文件</button>
+            <div id="upload-status"></div>
         </div>
     </div>
 
-    <button onclick="testMessage()">测试消息</button>
-
     <script>
-        let isLoading = false;
-        
-        function showProgress(step) {
-            const bar = document.getElementById('progress-bar');
-            const status = document.getElementById('progress-status');
-            const statusText = document.getElementById('status-text');
-            
-            // 显示进度条和状态
-            bar.classList.add('progress-visible');
-            status.classList.add('progress-visible');
-            
-            // 更新状态文本
-            switch(step) {
-                case 'search':
-                    statusText.textContent = '正在检索知识库相关内容...';
-                    break;
-                case 'analyze':
-                    statusText.textContent = '大模型正在分析问题...';
-                    break;
-                case 'optimize':
-                    statusText.textContent = '正在优化回答内容...';
-                    break;
-                default:
-                    statusText.textContent = '处理中...';
-            }
-            
-            isLoading = true;
-        }
-        
-        function hideProgress() {
-            const bar = document.getElementById('progress-bar');
-            const status = document.getElementById('progress-status');
-            
-            // 隐藏进度条和状态
-            bar.classList.remove('progress-visible');
-            status.classList.remove('progress-visible');
-            
-            isLoading = false;
-        }
-        
-        function appendMessage(content, type, knowledge = '') {
-            const chatHistory = document.getElementById('chat-history');
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${type}-message`;
-            
-            // 为用户消息和助手消息使用不同的处理方式
-            if (type === 'user') {
-                // 用户消息简单显示
-                messageDiv.textContent = content;
-            } else {
-                // 助手消息使用 pre 标签保持格式
-                const answerPre = document.createElement('pre');
-                answerPre.style.whiteSpace = 'pre-wrap';
-                answerPre.style.fontFamily = 'inherit';
-                answerPre.textContent = content;
-                messageDiv.appendChild(answerPre);
-                
-                // 如果有知识库内容，添加到消息中
-                if (knowledge) {
-                    const knowledgeDiv = document.createElement('div');
-                    knowledgeDiv.className = 'knowledge-base';
-                    const knowledgePre = document.createElement('pre');
-                    knowledgePre.style.whiteSpace = 'pre-wrap';
-                    knowledgePre.style.fontFamily = 'inherit';
-                    knowledgePre.textContent = knowledge;
-                    knowledgeDiv.appendChild(knowledgePre);
-                    messageDiv.appendChild(knowledgeDiv);
-                }
-            }
-            
-            chatHistory.appendChild(messageDiv);
-            chatHistory.scrollTop = chatHistory.scrollHeight;
-        }
-        
         async function sendQuery() {
-            if (isLoading) return;
-            
             const input = document.getElementById('query-input');
             const query = input.value.trim();
             
             if (!query) return;
             
-            // 显示用户问题
-            appendMessage(query, 'user');
-            input.value = '';
-            
-            showProgress('search');
-            
             try {
-                console.log('发送请求...');
                 const response = await fetch('/api/chat', {
                     method: 'POST',
                     headers: {
@@ -312,150 +217,39 @@
                     body: JSON.stringify({ query })
                 });
                 
-                showProgress('analyze');
-                const result = await response.json();
-                console.log('API完整响应:', result);
-                
-                if (result.status === 'success' && result.data) {
-                    const responseData = result.data;  // 直接使用返回的data
-                    console.log('处理的响应数据:', responseData);
-                    
-                    if (!responseData.answer) {
-                        console.error('回答内容为空');
-                        appendMessage('抱歉，没有找到相关答案。', 'assistant');
-                        return;
-                    }
-                    
-                    // 创建回答消息容器
-                    const messageDiv = document.createElement('div');
-                    messageDiv.className = 'message assistant-message';
-                    
-                    // 添加回答内容
-                    const answerPre = document.createElement('pre');
-                    answerPre.style.whiteSpace = 'pre-wrap';
-                    answerPre.style.fontFamily = 'inherit';
-                    answerPre.textContent = responseData.answer;
-                    messageDiv.appendChild(answerPre);
-                    
-                    // 添加知识库内容
-                    if (responseData.knowledge_base_content) {
-                        const knowledgeDiv = document.createElement('div');
-                        knowledgeDiv.className = 'knowledge-base';
-                        const knowledgePre = document.createElement('pre');
-                        knowledgePre.style.whiteSpace = 'pre-wrap';
-                        knowledgePre.style.fontFamily = 'inherit';
-                        knowledgePre.textContent = responseData.knowledge_base_content;
-                        knowledgeDiv.appendChild(knowledgePre);
-                        messageDiv.appendChild(knowledgeDiv);
-                    }
-                    
-                    // 添加到聊天历史
-                    const chatHistory = document.getElementById('chat-history');
-                    chatHistory.appendChild(messageDiv);
-                    chatHistory.scrollTop = chatHistory.scrollHeight;
-                    
-                    // 添加元数据显示
-                    if (responseData.metadata && Object.keys(responseData.metadata).length > 0) {
-                        const metadataDiv = document.createElement('div');
-                        metadataDiv.className = 'metadata';
-                        metadataDiv.style.fontSize = '12px';
-                        metadataDiv.style.color = '#666';
-                        metadataDiv.textContent = `模型: ${responseData.metadata.model || 'unknown'} | 
-                            Tokens: ${responseData.metadata.usage?.total_tokens || 0}`;
-                        messageDiv.appendChild(metadataDiv);
-                    }
-                } else {
-                    console.error('API响应格式错误:', result);
-                    appendMessage('抱歉，处理您的请求时出现错误。', 'assistant');
-                }
-            } catch (error) {
-                console.error('请求错误:', error);
-                appendMessage('网络错误，请稍后重试。', 'assistant');
-            } finally {
-                hideProgress();
-            }
-        }
-        
-        async function clearHistory() {
-            if (isLoading) return;
-            
-            try {
-                const response = await fetch('/api/chat', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ clear_history: true })
-                });
-                
                 const result = await response.json();
                 
-                if (result.status === 'success') {
-                    document.getElementById('chat-history').innerHTML = '';
-                }
+                const container = document.getElementById('response-container');
+                container.innerHTML = `<pre>${JSON.stringify(result, null, 2)}</pre>`;
+                
             } catch (error) {
-                console.error('清除历史失败:', error);
+                console.error('Error:', error);
             }
         }
-        
-        // 支持回车发送
-        document.getElementById('query-input').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                sendQuery();
-            }
-        });
 
-        document.getElementById('uploadForm').onsubmit = async function(e) {
-            e.preventDefault();
-            const fileInput = document.getElementById('fileInput');
-            const statusDiv = document.getElementById('uploadStatus');
+        async function uploadFile() {
+            const fileInput = document.getElementById('file-input');
+            const file = fileInput.files[0];
             
-            if (!fileInput.files[0]) {
-                statusDiv.innerHTML = '<span class="error">请选择文件</span>';
-                return;
-            }
+            if (!file) return;
             
             const formData = new FormData();
-            formData.append('file', fileInput.files[0]);
+            formData.append('file', file);
             
             try {
-                const response = await fetch('http://localhost:8888/api/upload', {
+                const response = await fetch('/api/upload', {
                     method: 'POST',
                     body: formData
                 });
                 
-                const data = await response.json();
-                if (data.status === 'success') {
-                    statusDiv.textContent = '文件上传成功！';
-                } else {
-                    statusDiv.innerHTML = `<span class="error">上传失败：${data.message}</span>`;
-                }
+                const result = await response.json();
+                
+                const status = document.getElementById('upload-status');
+                status.innerHTML = `<pre>${JSON.stringify(result, null, 2)}</pre>`;
+                
             } catch (error) {
-                statusDiv.innerHTML = `<span class="error">请求失败：${error.message}</span>`;
+                console.error('Error:', error);
             }
-        };
-
-        function testMessage() {
-            const testData = {
-                answer: "这是一个测试回答",
-                knowledge_base_content: "这是测试的知识库内容"
-            };
-            
-            const messageDiv = document.createElement('div');
-            messageDiv.className = 'message assistant-message';
-            
-            const answerPre = document.createElement('pre');
-            answerPre.textContent = testData.answer;
-            messageDiv.appendChild(answerPre);
-            
-            const knowledgeDiv = document.createElement('div');
-            knowledgeDiv.className = 'knowledge-base';
-            const knowledgePre = document.createElement('pre');
-            knowledgePre.textContent = testData.knowledge_base_content;
-            knowledgeDiv.appendChild(knowledgePre);
-            messageDiv.appendChild(knowledgeDiv);
-            
-            document.getElementById('chat-history').appendChild(messageDiv);
         }
     </script>
 </body>

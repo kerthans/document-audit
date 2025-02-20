@@ -3,6 +3,7 @@ import tornado.web
 import json
 import os
 import sys
+import logging
 
 # 添加项目根目录到Python路径
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -15,6 +16,8 @@ from app.handlers.chat import ChatHandler
 from app.handlers.upload import UploadHandler
 from app.handlers.document import DocumentListHandler
 from app.utils.logger import logger
+
+logger = logging.getLogger(__name__)
 
 class BaseHandler(tornado.web.RequestHandler):
     def set_default_headers(self):
@@ -29,7 +32,40 @@ class BaseHandler(tornado.web.RequestHandler):
 # 添加主页处理器
 class MainHandler(tornado.web.RequestHandler):
     def get(self):
-        self.render("index.html")
+        try:
+            logger.info("="*50)
+            logger.info("收到首页请求")
+            logger.info(f"请求路径: {self.request.path}")
+            logger.info(f"请求方法: {self.request.method}")
+            logger.info(f"请求头: {self.request.headers}")
+            
+            template_path = self.settings['template_path']
+            template_file = os.path.join(template_path, 'index.html')
+            
+            logger.info(f"模板路径: {template_path}")
+            logger.info(f"模板文件: {template_file}")
+            logger.info(f"模板文件存在: {os.path.exists(template_file)}")
+            
+            if not os.path.exists(template_file):
+                raise FileNotFoundError(f"模板文件不存在: {template_file}")
+            
+            self.render("index.html")
+            logger.info("成功渲染模板")
+            
+        except Exception as e:
+            logger.error("="*50)
+            logger.error(f"渲染主页时发生错误: {str(e)}")
+            logger.error(f"错误类型: {type(e).__name__}")
+            logger.error(f"错误详情: {str(e)}")
+            import traceback
+            logger.error(f"错误堆栈: \n{traceback.format_exc()}")
+            
+            self.set_status(500)
+            self.write({
+                "error": "服务器内部错误",
+                "detail": str(e),
+                "type": type(e).__name__
+            })
 
 class ChatHandler(BaseHandler):
     def initialize(self):
@@ -131,22 +167,79 @@ class DocumentListHandler(BaseHandler):
                 "message": str(e)
             })
 
+class ErrorHandler(tornado.web.RequestHandler):
+    def initialize(self, status_code):
+        self.set_status(status_code)
+    
+    def prepare(self):
+        if self.get_status() == 404:
+            self.write({"error": "请求的资源不存在"})
+        elif self.get_status() == 500:
+            self.write({"error": "服务器内部错误"})
+        self.finish()
+
 def make_app():
-    current_dir = os.path.dirname(os.path.abspath(__file__))
+    root_dir = os.path.dirname(os.path.abspath(__file__))
+    
+    settings = {
+        "template_path": os.path.join(root_dir, "templates"),
+        "static_path": os.path.join(root_dir, "static"),
+        "debug": True,
+        "default_handler_class": ErrorHandler,
+        "default_handler_args": dict(status_code=404)
+    }
+    
+    # 在启动时检查目录是否存在
+    if not os.path.exists(settings["template_path"]):
+        os.makedirs(settings["template_path"])
+        logger.warning(f"Created missing template directory: {settings['template_path']}")
+    
+    if not os.path.exists(settings["static_path"]):
+        os.makedirs(settings["static_path"])
+        logger.warning(f"Created missing static directory: {settings['static_path']}")
     
     return tornado.web.Application([
         (r"/", MainHandler),
+        (r"/index.html", MainHandler),
         (r"/api/chat", ChatHandler),
         (r"/api/upload", UploadHandler),
         (r"/api/documents", DocumentListHandler),
-    ],
-    template_path=os.path.join(current_dir, "templates"),
-    static_path=os.path.join(current_dir, "static"),
-    debug=True
-    )
+    ], **settings)
 
 if __name__ == "__main__":
-    app = make_app()
-    app.listen(8888)
-    print("Server is running at http://localhost:8888")
-    tornado.ioloop.IOLoop.current().start() 
+    try:
+        app = make_app()
+        port = 8888
+        
+        # 检查关键目录和文件
+        root_dir = os.path.dirname(os.path.abspath(__file__))
+        template_dir = os.path.join(root_dir, "templates")
+        index_file = os.path.join(template_dir, "index.html")
+        
+        logger.info("="*50)
+        logger.info("服务器启动检查")
+        logger.info(f"项目根目录: {root_dir}")
+        logger.info(f"模板目录: {template_dir}")
+        logger.info(f"index.html路径: {index_file}")
+        logger.info(f"模板目录存在: {os.path.exists(template_dir)}")
+        logger.info(f"index.html存在: {os.path.exists(index_file)}")
+        
+        if not os.path.exists(template_dir):
+            logger.warning(f"创建模板目录: {template_dir}")
+            os.makedirs(template_dir)
+            
+        if not os.path.exists(index_file):
+            logger.error(f"index.html 文件不存在！")
+            
+        app.listen(port)
+        logger.info(f"服务器启动成功: http://localhost:{port}")
+        tornado.ioloop.IOLoop.current().start()
+        
+    except Exception as e:
+        logger.error("="*50)
+        logger.error("服务器启动失败")
+        logger.error(f"错误类型: {type(e).__name__}")
+        logger.error(f"错误信息: {str(e)}")
+        import traceback
+        logger.error(f"错误堆栈: \n{traceback.format_exc()}")
+        sys.exit(1) 
