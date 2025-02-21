@@ -12,6 +12,7 @@ class DocumentService:
         self.dataset_id = DIFY_CONFIG['dataset_id']
         self.base_url = DIFY_CONFIG['base_url']
         self.workflow_service = WorkflowService()
+        self.converter_url = "http://127.0.0.1:5000"
     
     def _clean_knowledge_base(self):
         """清理knowledge_base文件夹，只保留最新文件"""
@@ -24,30 +25,116 @@ class DocumentService:
             except Exception as e:
                 logger.error(f"删除文件失败: {file}, 错误: {str(e)}")
     
+    def _decode_content(self, content):
+        """尝试使用不同编码解码文件内容"""
+        encodings = ['utf-8', 'gbk', 'gb18030', 'big5', 'latin1']
+        
+        for encoding in encodings:
+            try:
+                text_content = content.decode(encoding)
+                logger.info(f"成功使用 {encoding} 解码文件")
+                return text_content
+            except UnicodeDecodeError:
+                continue
+        
+        # 如果所有编码都失败，尝试使用errors='ignore'
+        logger.warning("所有编码尝试失败，使用ignore模式解码")
+        return content.decode('utf-8', errors='ignore')
+    
+    async def convert_docx_to_md(self, filename, content):
+        """将docx文件转换为markdown格式"""
+        try:
+            logger.info(f"开始转换文件: {filename}")
+            logger.info(f"转换服务URL: {self.converter_url}/convert")
+            
+            # 发送转换请求
+            convert_request = requests.post(
+                f'{self.converter_url}/convert',
+                files={'file': (filename, content)}
+            )
+
+             # 添加调试信息
+            print(f"Response status code: {convert_request.status_code}")
+            print(f"Response content: {convert_request.text}")
+
+            convert_request.raise_for_status()
+            # convert_info = convert_request.content
+            response_data = convert_request.json()
+            task_id = response_data.get('task_id')
+
+            if not task_id:
+                self.set_status(500)
+                self.write({
+                    "status": "error",
+                    "message": "转换服务task_id获取失败"
+                })
+                return
+
+            convert_response = requests.get(f'http://127.0.0.1:5000/result/{task_id}')
+            
+            # 记录响应信息
+            logger.info(f"转换服务响应状态码: {convert_response.status_code}")
+            
+            convert_response.raise_for_status()
+            
+            # 直接获取响应文本作为markdown内容
+            md_content = convert_response.text
+            
+            if not md_content:
+                raise ValueError("转换服务返回的Markdown内容为空")
+            
+            logger.info("文件转换成功")
+            logger.info(f"转换后的内容长度: {len(md_content)} 字符")
+            return md_content
+            
+        except requests.RequestException as e:
+            logger.error(f"请求转换服务失败: {str(e)}")
+            if hasattr(e, 'response'):
+                logger.error(f"错误响应: {e.response.text}")
+            raise ValueError(f"转换服务请求失败: {str(e)}")
+            
+        except Exception as e:
+            logger.error(f"转换docx文件失败: {str(e)}")
+            logger.error(f"错误类型: {type(e).__name__}")
+            import traceback
+            logger.error(f"错误堆栈: \n{traceback.format_exc()}")
+            raise
+    
     async def upload_document(self, file_info):
         """上传文档到Dify并进行法规评估"""
         try:
             # 清理knowledge_base文件夹
             self._clean_knowledge_base()
             
-            # 保存新文件到knowledge_base
-            file_path = os.path.join(FILE_CONFIG['upload_dir'], file_info['filename'])
+            filename = file_info['filename']
+            content = file_info['body']
+            
+            # 处理.docx文件
+            if filename.lower().endswith('.docx'):
+                logger.info(f"检测到docx文件: {filename}，开始转换")
+                md_content = await self.convert_docx_to_md(filename, content)
+                filename = filename.replace('.docx', '.md')
+                content = md_content.encode('utf-8')
+                logger.info(f"docx文件转换完成，新文件名: {filename}")
+            
+            # 保存文件
+            file_path = os.path.join(FILE_CONFIG['upload_dir'], filename)
             with open(file_path, 'wb') as f:
-                f.write(file_info['body'])
-            logger.info(f"已保存新文件到knowledge_base: {file_info['filename']}")
+                f.write(content)
+            logger.info(f"已保存文件到knowledge_base: {filename}")
             
-            # 1. 上传到Dify知识库
+            # 解码文件内容
+            text_content = self._decode_content(content)
+            
+            # 上传到Dify知识库
             url = f"{self.base_url}/datasets/{self.dataset_id}/document/create-by-text"
-            
             headers = {
                 'Authorization': f'Bearer {self.api_key}',
                 'Content-Type': 'application/json'
             }
             
-            text_content = file_info['body'].decode('utf-8')
-            
             data = {
-                "name": file_info['filename'],
+                "name": filename,
                 "text": text_content,
                 "indexing_technique": "high_quality",
                 "process_rule": {
@@ -57,22 +144,17 @@ class DocumentService:
             
             response = requests.post(url, headers=headers, json=data)
             response.raise_for_status()
+            logger.info(f"文件已上传到Dify知识库: {filename}")
             
-            logger.info(f"文件已上传到Dify知识库: {file_info['filename']}")
-            
-            # 2. 进行法规评估
+            # 进行法规评估
             law_list_dir = 'Law_list'
-            
-            # 确保输出目录存在
             os.makedirs('Judge_output', exist_ok=True)
             
-            # 运行工作流进行评估
             assessment_results = []
             for law_file in os.listdir(law_list_dir):
                 if law_file.endswith('.md'):
                     law_file_path = os.path.join(law_list_dir, law_file)
-                    
-                    logger.info(f"正在评估文件 {file_info['filename']} 与法规 {law_file}")
+                    logger.info(f"正在评估文件 {filename} 与法规 {law_file}")
                     output_text = await self.workflow_service.run_workflow(law_file_path, file_path)
                     
                     if output_text:
@@ -81,8 +163,7 @@ class DocumentService:
                             'assessment': output_text
                         })
                         
-                        # 保存评估结果
-                        output_path = os.path.join('Judge_output', f"{file_info['filename']}_{law_file}")
+                        output_path = os.path.join('Judge_output', f"{filename}_{law_file}")
                         with open(output_path, 'w', encoding='utf-8') as f:
                             f.write(output_text)
                         logger.info(f"已保存评估结果: {output_path}")
@@ -95,8 +176,9 @@ class DocumentService:
             
         except Exception as e:
             logger.error(f"处理文件时发生错误: {str(e)}")
-            if hasattr(e, 'response'):
-                logger.error(f"错误响应: {e.response.text}")
+            logger.error(f"错误类型: {type(e).__name__}")
+            import traceback
+            logger.error(f"错误堆栈: \n{traceback.format_exc()}")
             return None
     
     async def get_documents(self):

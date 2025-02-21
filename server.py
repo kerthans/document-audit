@@ -102,8 +102,27 @@ class UploadHandler(BaseHandler):
     
     async def post(self):
         try:
+            if 'file' not in self.request.files:
+                self.set_status(400)
+                self.write({
+                    "status": "error",
+                    "message": "没有找到上传的文件"
+                })
+                return
+                
             file_info = self.request.files['file'][0]
             filename = file_info['filename']
+            
+            # 确保文件名是UTF-8编码
+            try:
+                filename = filename.encode('latin1').decode('utf-8')
+            except UnicodeError:
+                try:
+                    filename = filename.encode('latin1').decode('gbk')
+                except UnicodeError:
+                    filename = filename  # 保持原样
+            
+            logger.info(f"处理上传文件: {filename}")
             
             # 确保目录存在
             os.makedirs(FILE_CONFIG['upload_dir'], exist_ok=True)
@@ -112,6 +131,8 @@ class UploadHandler(BaseHandler):
             file_path = os.path.join(FILE_CONFIG['upload_dir'], filename)
             with open(file_path, 'wb') as f:
                 f.write(file_info['body'])
+            
+            logger.info(f"文件已保存到: {file_path}")
             
             # 上传到Dify并进行法规评估
             result = await self.document_service.upload_document(file_info)
@@ -134,10 +155,13 @@ class UploadHandler(BaseHandler):
                 
         except Exception as e:
             logger.error(f"处理上传请求时发生错误: {str(e)}")
+            logger.error(f"错误类型: {type(e).__name__}")
+            import traceback
+            logger.error(f"错误堆栈: \n{traceback.format_exc()}")
             self.set_status(500)
             self.write({
                 "status": "error",
-                "message": str(e)
+                "message": f"文件处理错误: {str(e)}"
             })
 
 class DocumentListHandler(BaseHandler):

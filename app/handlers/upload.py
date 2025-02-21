@@ -1,5 +1,6 @@
 from .base import BaseHandler
 from ..services.document import DocumentService
+from ..utils.logger import logger
 
 class UploadHandler(BaseHandler):
     def initialize(self):
@@ -16,6 +17,8 @@ class UploadHandler(BaseHandler):
                 return
                 
             file_info = self.request.files['file'][0]
+            logger.info(f"接收到文件: {file_info['filename']}")
+            
             result = await self.document_service.upload_document(file_info)
             
             if result:
@@ -32,6 +35,10 @@ class UploadHandler(BaseHandler):
                 })
                 
         except Exception as e:
+            logger.error(f"处理上传请求时发生错误: {str(e)}")
+            logger.error(f"错误类型: {type(e).__name__}")
+            import traceback
+            logger.error(f"错误堆栈: \n{traceback.format_exc()}")
             self.set_status(500)
             self.write({
                 "status": "error",
