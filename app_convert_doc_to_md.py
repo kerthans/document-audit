@@ -13,6 +13,7 @@ from magic_pdf.model.doc_analyze_by_custom_model import doc_analyze
 from magic_pdf.config.enums import SupportedPdfParseMethod
 from openai import OpenAI
 import convertapi
+from config.config import CONVERT_DOC_TO_MD_CONFIG
 
 # 设置中文本地化环境
 locale.setlocale(locale.LC_ALL, 'zh_CN.UTF-8')
@@ -22,15 +23,15 @@ app = Flask(__name__)
 # ================== 全局配置 ==================
 # 获取当前文件的绝对路径
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-
-# 上传目录配置
 UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB
 
 # 第三方服务配置
-convertapi.api_credentials = 'secret_HFA4yLSlXBBCZlPe'
-kimi_api_key = 'sk-3scaeuq5Pvut0jW1d7YsAQV3fkXr3X6rfwk61IEDzgqHUxhG'
+convertapi.api_credentials = CONVERT_DOC_TO_MD_CONFIG['convert_api_credentials'] 
+kimi_api_key = CONVERT_DOC_TO_MD_CONFIG['kimi_api_key']
+# convertapi.api_credentials = 'secret_HFA4yLSlXBBCZlPe' 
+# kimi_api_key = 'sk-3scaeuq5Pvut0jW1d7YsAQV3fkXr3X6rfwk61IEDzgqHUxhG'
 
 # 内存存储任务状态
 tasks = {}
