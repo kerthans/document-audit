@@ -4,7 +4,7 @@
  */
 
 // 开发环境API基础URL
-export const DEV_API_URL = 'http://localhost:8000';
+export const DEV_API_URL = 'http://localhost:8888';
 
 // 生产环境API基础URL  
 export const PROD_API_URL = 'https://api.your-production-domain.com';

@@ -1,7 +1,46 @@
+// hooks/useChat.js
 import { useState, useCallback } from 'react';
 
-// API 基础URL
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = 'http://localhost:8888';
+
+// 简化后的数据提取函数
+const extractResponseData = (response) => {
+  try {
+    if (!response || typeof response !== 'object') {
+      throw new Error('响应数据格式错误');
+    }
+
+    // 检查响应状态
+    if (response.code !== 200) {
+      throw new Error(response.message || '请求失败');
+    }
+
+    return {
+      answer: typeof response.answer === 'string' 
+        ? response.answer.replace(/^优化后的回答：\n*/, '').trim()
+        : typeof response.answer?.content === 'string'
+          ? response.answer.content.replace(/^优化后的回答：\n*/, '').trim()
+          : '无法解析回答内容',
+      references: response.knowledge_base_content || '',
+      metadata: {
+        model: response.metadata?.model || 'unknown',
+        usage: response.metadata?.usage || {}
+      },
+      timestamp: response.timestamp || new Date().toISOString()
+    };
+  } catch (error) {
+    console.error('解析响应数据出错:', error);
+    return {
+      answer: '抱歉，解析响应时出现错误',
+      references: '',
+      metadata: {
+        model: 'unknown',
+        usage: {}
+      },
+      timestamp: new Date().toISOString()
+    };
+  }
+};
 
 export default function useChat() {
   const [messages, setMessages] = useState([]);
@@ -10,86 +49,75 @@ export default function useChat() {
 
   const sendMessage = useCallback(async (message) => {
     if (!message.trim()) return;
+
+    const userMessage = { 
+      role: 'user', 
+      content: message,
+      timestamp: new Date().toISOString()
+    };
     
-    // 添加用户消息
-    const userMessage = { role: 'user', content: message };
     setMessages(prev => [...prev, userMessage]);
     setIsLoading(true);
     setError(null);
 
     try {
-      // 尝试连接后端API
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒超时
-      
+      const timeoutId = setTimeout(() => controller.abort(), 50000);
+
+      // 添加加载消息
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: '正在思考中...',
+        isLoading: true,
+        timestamp: new Date().toISOString()
+      }]);
+
       const response = await fetch(`${API_BASE_URL}/api/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          message,
-          history: messages.map(msg => ({
-            role: msg.role,
-            content: msg.content
-          })),
+          query: message
         }),
         signal: controller.signal
-      }).catch(err => {
-        // 将网络错误转换为自定义错误对象
-        if (err.name === 'AbortError') {
-          throw new Error('请求超时，服务器响应时间过长');
-        }
-        throw new Error(`网络错误: ${err.message}`);
       });
-      
+
       clearTimeout(timeoutId);
       
+      // 移除加载消息
+      setMessages(prev => prev.filter(msg => !msg.isLoading));
+
       if (!response.ok) {
-        let errorMsg = `服务器错误 (${response.status})`;
-        try {
-          const errorData = await response.json();
-          if (errorData && errorData.message) {
-            errorMsg = errorData.message;
-          }
-        } catch (e) {
-          // 无法解析错误响应，使用默认错误消息
-        }
-        throw new Error(errorMsg);
+        throw new Error(`请求失败: ${response.status}`);
       }
 
-      const data = await response.json();
-      
-      // 添加AI响应
-      setMessages(prev => [...prev, { 
-        role: 'assistant', 
-        content: data.response || '抱歉，服务器返回了空响应。'
-      }]);
-      return data.response;
+      const rawData = await response.json();
+      const { answer, references, metadata, timestamp } = extractResponseData(rawData);
+
+      const assistantMessage = {
+        role: 'assistant',
+        content: answer,
+        references,
+        metadata,
+        timestamp
+      };
+
+      setMessages(prev => [...prev.filter(msg => !msg.isLoading), assistantMessage]);
+
     } catch (err) {
-      console.error('聊天请求失败:', err);
-      setError(err.message || '发送消息时出现未知错误');
-      
-      // 如果是网络连接问题，使用本地模拟响应
-      if (err.message.includes('网络错误') || err.message.includes('请求超时')) {
-        const fallbackMessage = { 
-          role: 'assistant', 
-          content: '看起来服务器连接出现问题。这是一个离线回复：我理解您的问题，但目前无法连接到服务器。请检查您的网络连接或稍后再试。'
-        };
-        setMessages(prev => [...prev, fallbackMessage]);
-        return fallbackMessage.content;
-      }
-      
-      // 添加系统错误消息
-      setMessages(prev => [...prev, { 
-        role: 'system', 
-        content: '抱歉，发送消息时出现错误。请稍后再试。' 
+      console.error('发送消息失败:', err);
+      setError(err.message);
+
+      setMessages(prev => [...prev.filter(msg => !msg.isLoading), {
+        role: 'system',
+        content: `发送失败: ${err.message}`,
+        timestamp: new Date().toISOString()
       }]);
-      return null;
     } finally {
       setIsLoading(false);
     }
-  }, [messages]);
+  }, []);
 
   const clearMessages = useCallback(() => {
     setMessages([]);

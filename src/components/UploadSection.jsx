@@ -25,7 +25,7 @@ import axios from 'axios';
 import ResultDialog from './ResultDialog';
 
 // API配置
-const API_URL = 'http://localhost:5001';
+const API_URL = 'http://localhost:8888';
 // const API_URL = 'http://47.109.205.129:5001';
 
 
@@ -149,38 +149,38 @@ function UploadSection() {
     setClientId(newClientId);
 
     // 建立 SSE 连接
-    const setupEventSource = () => {
-      const eventSource = new EventSource(`${API_URL}/api/events?clientId=${newClientId}`);
-      eventSourceRef.current = eventSource;
+    // const setupEventSource = () => {
+    //   const eventSource = new EventSource(`${API_URL}/api/events?clientId=${newClientId}`);
+    //   eventSourceRef.current = eventSource;
 
-      eventSource.onopen = () => {
-        setConnected(true);
-        showSnackbar('已成功连接到服务器', 'success');
-      };
+    //   eventSource.onopen = () => {
+    setConnected(true);
+    //     showSnackbar('已成功连接到服务器', 'success');
+    //   };
 
-      eventSource.onerror = (error) => {
-        console.error('SSE连接错误:', error);
-        setConnected(false);
-        showSnackbar('服务器连接失败，正在重试...', 'warning');
+    //   eventSource.onerror = (error) => {
+    //     console.error('SSE连接错误:', error);
+    //     setConnected(false);
+    //     showSnackbar('服务器连接失败，正在重试...', 'warning');
         
-        // 错误处理和重连逻辑
-        if (eventSource.readyState === EventSource.CLOSED) {
-          setTimeout(setupEventSource, 5000); // 5秒后重试
-        }
-      };
+    //     // 错误处理和重连逻辑
+    //     if (eventSource.readyState === EventSource.CLOSED) {
+    //       setTimeout(setupEventSource, 5000); // 5秒后重试
+    //     }
+    //   };
 
-      // 处理服务器发送的消息
-      eventSource.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          handleServerEvent(data);
-        } catch (error) {
-          console.error('解析服务器消息失败:', error);
-        }
-      };
-    };
+    //   // 处理服务器发送的消息
+    //   eventSource.onmessage = (event) => {
+    //     try {
+    //       const data = JSON.parse(event.data);
+    //       handleServerEvent(data);
+    //     } catch (error) {
+    //       console.error('解析服务器消息失败:', error);
+    //     }
+    //   };
+    // };
 
-    setupEventSource();
+    // setupEventSource();
 
     // 组件卸载时清理
     return () => {
@@ -289,25 +289,26 @@ function UploadSection() {
       showSnackbar('请先选择文件', 'warning');
       return;
     }
-
+  
     if (!connected) {
       showSnackbar('未连接到服务器，请稍后重试', 'error');
       return;
     }
-
+  
     const formData = new FormData();
     formData.append('file', file);
-
+  
     setLoading(true);
     setProgress(0);
     setResult(null);
-
+  
     try {
       await axios.post(`${API_URL}/api/upload`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
           'Client-ID': clientId,
         },
+        withCredentials: true, // 添加这行
         onUploadProgress: (progressEvent) => {
           const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
           setProgress(percentCompleted);
@@ -317,11 +318,11 @@ function UploadSection() {
       showSnackbar('文档已上传，正在进行智能分析...', 'info');
     } catch (error) {
       console.error('上传失败:', error);
-      showSnackbar(error.response?.data?.error || '上传失败，请重试', 'error');
+      const errorMessage = error.response?.data?.error || '上传失败，请重试';
+      showSnackbar(errorMessage, 'error');
       setLoading(false);
     }
   };
-
   return (
     <Fade in={true} timeout={800}>
       <Box

@@ -66,12 +66,11 @@ export default function ChatPage() {
   useEffect(() => {
     const checkServerStatus = async () => {
       try {
-        const response = await fetch('http://localhost:8000/api/health', {
+        const response = await fetch('http://localhost:8888/api/health', {
           method: 'GET',
           headers: {
             'Accept': 'application/json',
           },
-          // 设置较短的超时时间
           signal: AbortSignal.timeout(3000)
         });
         
@@ -90,12 +89,8 @@ export default function ChatPage() {
       }
     };
 
-    // 立即检查一次
     checkServerStatus();
-    
-    // 设置定期检查
     const intervalId = setInterval(checkServerStatus, 30000);
-    
     return () => clearInterval(intervalId);
   }, []);
 
@@ -181,7 +176,6 @@ export default function ChatPage() {
           <PlusCircle size={24} />
         </button>
         
-        {/* 移动版菜单 */}
         {isMobileMenuOpen && (
           <div className="absolute bottom-16 left-0 bg-white rounded-lg shadow-xl p-2 w-48 border border-gray-200">
             <button
