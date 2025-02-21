@@ -82,20 +82,21 @@ async def main(request: Request):
         )
 
 @app.post("/api/chat")
-async def chat(request: Request):
+async def chat(query: str):
     try:
-        data = await request.json()
-        query = data.get('query', '')
+        # data = await query.json()
+        # query_content = data.get('query', '')
+        query_content = query
         
         if not query:
             raise HTTPException(status_code=400, detail="查询内容不能为空")
             
-        response = await chat_service.retrieve_knowledge(query)
-        formatted_response = chat_service.format_response(response)
+        response = await chat_service.retrieve_knowledge(query_content)
+        # formatted_response = chat_service.format_response(response)
         
         return {
             "status": "success",
-            "data": formatted_response
+            "data": response
         }
         
     except Exception as e:
