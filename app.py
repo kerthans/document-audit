@@ -1,24 +1,32 @@
+from datetime import datetime
 from fastapi import FastAPI, File, UploadFile, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 import uvicorn
-import logging
 import os
 import sys
-import json
 import traceback
-from typing import Optional
-from typing import Dict
+from typing import Optional, Dict, Any
+from pydantic import BaseModel
+import json
 
+class ChatResponse(BaseModel):
+    code: int
+    answer: str
+    metadata: Dict[str, Any]
+    knowledge_base_content: str
+    timestamp: str
+class ChatRequest(BaseModel):
+    query: str
 # 添加项目根目录到Python路径
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 # 修改导入语句
 from app.services.chat import ChatService
 from app.services.document import DocumentService
-from config.config import DIFY_CONFIG, FILE_CONFIG
+from config.config import FILE_CONFIG
 from app.utils.logger import logger
 
 # 创建FastAPI应用
@@ -36,78 +44,215 @@ app.add_middleware(
 # 获取项目根目录
 root_dir = os.path.dirname(os.path.abspath(__file__))
 
-# 配置静态文件和模板
-# templates = Jinja2Templates(directory=os.path.join(root_dir, "templates"))
-# app.mount("/static", StaticFiles(directory=os.path.join(root_dir, "static")), name="static")
-
 # 创建服务实例
 chat_service = ChatService()
 document_service = DocumentService()
 
-@app.get("/")
-@app.get("/index.html")
-async def main(request: Request):
+# @app.get("/")
+# @app.get("/index.html")
+# async def main(request: Request):
+#     try:
+#         logger.info("="*50)
+#         logger.info("收到首页请求")
+#         logger.info(f"请求路径: {request.url.path}")
+#         logger.info(f"请求方法: {request.method}")
+#         logger.info(f"请求头: {request.headers}")
+        
+#         template_path = os.path.join(root_dir, "templates")
+#         template_file = os.path.join(template_path, "index.html")
+        
+#         logger.info(f"模板路径: {template_path}")
+#         logger.info(f"模板文件: {template_file}")
+#         logger.info(f"模板文件存在: {os.path.exists(template_file)}")
+        
+#         if not os.path.exists(template_file):
+#             raise FileNotFoundError(f"模板文件不存在: {template_file}")
+        
+#     except Exception as e:
+#         logger.error("="*50)
+#         logger.error(f"渲染主页时发生错误: {str(e)}")
+#         logger.error(f"错误类型: {type(e).__name__}")
+#         logger.error(f"错误堆栈: \n{traceback.format_exc()}")
+        
+#         raise HTTPException(
+#             status_code=500,
+#             detail={
+#                 "error": "服务器内部错误",
+#                 "detail": str(e),
+#                 "type": type(e).__name__
+#             }
+#         )
+
+# @app.post("/api/chat")
+# async def chat(query: str):
+#     try:
+#         # data = await query.json()
+#         # query_content = data.get('query', '')
+#         query_content = query
+        
+#         if not query:
+#             raise HTTPException(status_code=400, detail="查询内容不能为空")
+            
+#         response = await chat_service.retrieve_knowledge(query_content)
+#         # formatted_response = chat_service.format_response(response)
+        
+#         return {
+#             "status": "success",
+#             "data": response
+#         }
+        
+#     except Exception as e:
+#         raise HTTPException(
+#             status_code=500,
+#             detail={
+#                 "status": "error",
+#                 "message": str(e)
+#             }
+#         )
+
+@app.get("/api/health")
+async def health_check():
+    """健康检查接口"""
+    return {
+        "status": "success",
+        "message": "Server is running",
+        "service": "chat-service",
+        "version": "1.0.0"
+    }
+@app.post("/api/chat")
+async def chat(request: ChatRequest):
     try:
-        logger.info("="*50)
-        logger.info("收到首页请求")
-        logger.info(f"请求路径: {request.url.path}")
-        logger.info(f"请求方法: {request.method}")
-        logger.info(f"请求头: {request.headers}")
-        
-        template_path = os.path.join(root_dir, "templates")
-        template_file = os.path.join(template_path, "index.html")
-        
-        logger.info(f"模板路径: {template_path}")
-        logger.info(f"模板文件: {template_file}")
-        logger.info(f"模板文件存在: {os.path.exists(template_file)}")
-        
-        if not os.path.exists(template_file):
-            raise FileNotFoundError(f"模板文件不存在: {template_file}")
-        
-        # return templates.TemplateResponse("index.html", {"request": request})
-        
+        if not request.query:
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "code": 400,
+                    "message": "查询内容不能为空"
+                }
+            )
+           
+        # 调用知识库服务获取回答
+        try:
+            response = await chat_service.retrieve_knowledge(request.query)
+        except Exception as service_error:
+            print(f"Knowledge service error: {str(service_error)}")
+            response = str(service_error)
+
+        # 从response中提取知识库内容
+        knowledge_content = ""
+        answer_content = ""
+
+        # 处理不同类型的响应
+        if isinstance(response, dict):
+            # 如果response是字典格式
+            if "data" in response and isinstance(response["data"], dict):
+                data = response["data"]
+                if "data" in data and isinstance(data["data"], dict):
+                    inner_data = data["data"]
+                    answer_content = inner_data.get("answer", "")
+                    knowledge_content = inner_data.get("knowledge_base_content", "")
+                else:
+                    answer_content = data.get("answer", "")
+                    knowledge_content = data.get("knowledge_base_content", "")
+            else:
+                answer_content = response.get("answer", "")
+                knowledge_content = response.get("knowledge_base_content", "")
+        else:
+            # 如果response是字符串
+            answer_content = str(response)
+
+        # 构造响应数据
+        response_data = {
+            "code": 200,
+            "answer": answer_content,
+            "metadata": {
+                "model": "glm-4-flash",
+                "usage": {
+                    "prompt_tokens": 0,
+                    "completion_tokens": 0,
+                    "total_tokens": 0
+                }
+            },
+            "knowledge_base_content": knowledge_content,
+            "timestamp": datetime.now().isoformat()
+        }
+
+        return JSONResponse(content=response_data)
+       
     except Exception as e:
-        logger.error("="*50)
-        logger.error(f"渲染主页时发生错误: {str(e)}")
-        logger.error(f"错误类型: {type(e).__name__}")
-        logger.error(f"错误堆栈: \n{traceback.format_exc()}")
-        
-        raise HTTPException(
+        print(f"Error in chat endpoint: {str(e)}")
+        error_response = {
+            "code": 500,
+            "message": str(e)
+        }
+        return JSONResponse(
             status_code=500,
-            detail={
-                "error": "服务器内部错误",
-                "detail": str(e),
-                "type": type(e).__name__
-            }
+            content=error_response
         )
 
-@app.post("/api/chat")
-async def chat(query: str):
+# 错误处理中间件
+@app.middleware("http")
+async def error_handling_middleware(request, call_next):
     try:
-        # data = await query.json()
-        # query_content = data.get('query', '')
-        query_content = query
-        
-        if not query:
-            raise HTTPException(status_code=400, detail="查询内容不能为空")
-            
-        response = await chat_service.retrieve_knowledge(query_content)
-        # formatted_response = chat_service.format_response(response)
-        
-        return {
-            "status": "success",
-            "data": response
-        }
-        
+        response = await call_next(request)
+        return response
     except Exception as e:
-        raise HTTPException(
+        print(f"Middleware caught error: {str(e)}")
+        return JSONResponse(
             status_code=500,
-            detail={
-                "status": "error",
+            content={
+                "code": 500,
                 "message": str(e)
             }
         )
-
+# @app.post("/api/chat")
+# async def chat(request: ChatRequest):
+#     try:
+#         if not request.query:
+#             raise HTTPException(status_code=400, detail="查询内容不能为空")
+           
+#         # 调用知识库服务获取回答
+#         response = await chat_service.retrieve_knowledge(request.query)
+        
+#         # 保持原有的返回格式结构
+#         return {
+#             "status": "success",
+#             "data": {
+#                 "code": 200,
+#                 "message": "success",
+#                 "data": {
+#                     "answer": response,
+#                     "metadata": {
+#                         "model": "glm-4-flash",
+#                         "usage": {
+#                             "prompt_tokens": 0,
+#                             "completion_tokens": 0,
+#                             "total_tokens": 0
+#                         }
+#                     },
+#                     "chat_history": [
+#                         {
+#                             "role": "user",
+#                             "content": request.query
+#                         },
+#                         {
+#                             "role": "assistant",
+#                             "content": response
+#                         }
+#                     ],
+#                     "knowledge_base_content": "" # 如果需要可以从response中提取
+#                 }
+#             }
+#         }
+       
+#     except Exception as e:
+#         raise HTTPException(
+#             status_code=500,
+#             detail={
+#                 "status": "error",
+#                 "message": str(e)
+#             }
+#         )
 @app.post("/api/upload")
 async def upload(file: UploadFile = File(...)):
     try:
