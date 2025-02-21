@@ -163,7 +163,7 @@ class DocumentService:
                             'assessment': output_text
                         })
                         
-                        output_path = os.path.join('Judge_output', f"{filename}_{law_file}")
+                        output_path = os.path.join('Judge_output', f"{law_file}")
                         with open(output_path, 'w', encoding='utf-8') as f:
                             f.write(output_text)
                         logger.info(f"已保存评估结果: {output_path}")

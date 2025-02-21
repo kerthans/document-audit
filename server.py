@@ -21,13 +21,25 @@ logger = logging.getLogger(__name__)
 
 class BaseHandler(tornado.web.RequestHandler):
     def set_default_headers(self):
-        self.set_header("Access-Control-Allow-Origin", "*")
-        self.set_header("Access-Control-Allow-Headers", "x-requested-with,content-type")
-        self.set_header("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
+        # 修改CORS配置，允许特定域名和请求头
+        self.set_header("Access-Control-Allow-Origin", "http://localhost:3000")
+        self.set_header("Access-Control-Allow-Headers", "x-requested-with, content-type, client-id")
+        self.set_header("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+        self.set_header("Access-Control-Allow-Credentials", "true")
     
-    def options(self):
+    def options(self, *args, **kwargs):
+        # 处理 OPTIONS 预检请求
         self.set_status(204)
         self.finish()
+# class BaseHandler(tornado.web.RequestHandler):
+#     def set_default_headers(self):
+#         self.set_header("Access-Control-Allow-Origin", "*")
+#         self.set_header("Access-Control-Allow-Headers", "x-requested-with,content-type")
+#         self.set_header("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
+    
+#     def options(self):
+#         self.set_status(204)
+#         self.finish()
 
 # 添加主页处理器
 class MainHandler(tornado.web.RequestHandler):
