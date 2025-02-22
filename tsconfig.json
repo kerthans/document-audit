@@ -1,0 +1,35 @@
+{
+  "compilerOptions": {
+    "target": "es5", // 指定 ECMAScript 目标版本
+    "module": "commonjs", // 指定使用模块系统
+    "lib": [
+      "dom",
+      "esnext"
+    ], // 指定要包含在编译中的库文件
+    "baseUrl": ".", // 设置基础目录，用于非相对模块导入
+    "paths": { // 指定模块名到基于 baseUrl 的路径映射
+      "@//*": [
+        "src/*"
+      ]
+    },
+    "strict": true, // 启用所有严格类型检查选项
+    "esModuleInterop": true, // 允许默认导入非ES模块
+    "skipLibCheck": true, // 跳过所有声明文件的类型检查
+    "forceConsistentCasingInFileNames": true // 确保文件名的大小写是一致的
+    ,
+    "allowJs": true,
+    "noEmit": true,
+    "incremental": true,
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve"
+  },
+  "include": [
+    "src"
+  ], // 指定需要编译的文件
+  "exclude": [
+    "node_modules",
+    "dist"
+  ] // 指定不需要编译的文件
+}
